@@ -63,18 +63,28 @@ def calculate_head_pose(matrix):
     
     return float(pitch), float(yaw), float(roll)
 
-def draw_head_pose_axes(frame, matrix, landmarks, axis_length=60):
+def draw_head_pose_axes(frame, matrix, landmarks, axis_length=None):
     """
     Отрисовывает 3D оси координат ориентации головы на кадре, начиная от кончика носа:
     - Красная ось (X): вправо
     - Зеленая ось (Y): вверх
     - Синяя ось (Z): вперед (направление взгляда/лица)
+    Масштаб осей и толщина линий автоматически адаптируются под разрешение кадра.
     """
     if matrix is None or landmarks is None:
         return frame
 
     import cv2
     h, w, _ = frame.shape
+    scale = min(w / 640.0, h / 480.0)
+
+    if axis_length is None:
+        axis_len = int(55 * scale)
+    elif axis_length in (50, 60):
+        axis_len = int(axis_length * scale)
+    else:
+        axis_len = int(axis_length)
+
     # Индекс 1 в MediaPipe FaceMesh — кончик носа
     nose = landmarks[1]
     cx, cy = int(nose.x * w), int(nose.y * h)
@@ -83,15 +93,19 @@ def draw_head_pose_axes(frame, matrix, landmarks, axis_length=60):
 
     # Проекция единичных векторов канонической системы в 2D координаты изображения
     # В экранных координатах ось Y направлена вниз, поэтому инвертируем знак Y
-    p_x = (int(cx + R[0, 0] * axis_length), int(cy - R[1, 0] * axis_length))
-    p_y = (int(cx + R[0, 1] * axis_length), int(cy - R[1, 1] * axis_length))
-    p_z = (int(cx + R[0, 2] * axis_length), int(cy - R[1, 2] * axis_length))
+    p_x = (int(cx + R[0, 0] * axis_len), int(cy - R[1, 0] * axis_len))
+    p_y = (int(cx + R[0, 1] * axis_len), int(cy - R[1, 1] * axis_len))
+    p_z = (int(cx + R[0, 2] * axis_len), int(cy - R[1, 2] * axis_len))
+
+    line_thickness = max(1, int(round(2 * scale)))
+    nose_radius = max(2, int(round(3 * scale)))
 
     # Отрисовка стрелок для осей: X - красный, Y - зеленый, Z - синий
-    cv2.arrowedLine(frame, (cx, cy), p_x, (0, 0, 255), 2, tipLength=0.2)
-    cv2.arrowedLine(frame, (cx, cy), p_y, (0, 255, 0), 2, tipLength=0.2)
-    cv2.arrowedLine(frame, (cx, cy), p_z, (255, 0, 0), 2, tipLength=0.2)
-    cv2.circle(frame, (cx, cy), 3, (0, 255, 255), -1)
+    cv2.arrowedLine(frame, (cx, cy), p_x, (0, 0, 255), line_thickness, tipLength=0.2)
+    cv2.arrowedLine(frame, (cx, cy), p_y, (0, 255, 0), line_thickness, tipLength=0.2)
+    cv2.arrowedLine(frame, (cx, cy), p_z, (255, 0, 0), line_thickness, tipLength=0.2)
+    cv2.circle(frame, (cx, cy), nose_radius, (0, 255, 255), -1)
 
     return frame
+
 
